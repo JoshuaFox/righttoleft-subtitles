@@ -1,3 +1,4 @@
+import itertools
 import os.path
 import sys
 import time
@@ -5,7 +6,7 @@ import unicodedata
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import ClassVar
+from typing import ClassVar, List
 
 import ke
 
@@ -60,16 +61,13 @@ def rtl_ke():
 
 
 def normalize(lines):
-    ret = []
-    prev = "N/A"
-    lines = [l.strip() for l in lines]
-    for l in lines:
-        l=l.replace("\u2060","")#remove wordjoiner char
-        if prev != "" or l != "":
-            ret.append(l)# merge two or more blanklines
-        prev = l
 
-    return ret
+    lines_stripped = [l.strip().replace("\u2060", "") for l in lines]#strip. remove Word Joiner
+    def collapse_blankline_sequences(lines: List[str]):
+        groups = (list(group) for _, group in itertools.groupby(lines, lambda x: x))
+        return ('' if not group[0] and len(group) > 1 else group[0] for group in groups)
+    return collapse_blankline_sequences(lines_stripped)
+
 
 
 def move_punc(line):
@@ -86,22 +84,16 @@ def move_punc(line):
         return line
 
 
-def is_nonneg_int(s):
-    return s.isdigit()
-
-
 def process(f_in, f_out):
     screen = None
     errors = []
     with open(f_in) as f_i:
         with open(f_out, "w") as file_out:
             lines = f_i.readlines()
-            lines = normalize(lines)
-            prev_line = "N/A"
-            for line in lines:
-                screen = process_line(line, screen, prev_line, file_out, errors)
-                prev_line = line
-            if screen:  # if any lines at all
+            lines_normalized = normalize(lines)
+            for line in lines_normalized:
+                screen = process_line(line, screen, file_out, errors)
+            if screen:  # If there were any lines in the input file at all, don't forget the last one.
                 file_out.write(str(screen))
             else:
                 raise ValueError("No screens found in file")
@@ -109,8 +101,8 @@ def process(f_in, f_out):
         print("Errors\n", "\n".join(errors))
 
 
-def process_line(line, current_screen, prev_line, file_out, errors):
-    if is_nonneg_int(line):
+def process_line(line, current_screen,   file_out, errors):
+    if line.isdigit():  # nonneg integer
         if current_screen:
             if not current_screen.end_line_found:
                 errors.append(f"Blank-line missing:\n{current_screen}")
@@ -118,7 +110,7 @@ def process_line(line, current_screen, prev_line, file_out, errors):
         current_screen = Screen()
         current_screen.original_sequence_number = int(line)
     elif ke.match(
-            "[" + timestamp_kex_str + '" --> "' + timestamp_kex_str + "]", line
+            '[#timestamp=[' + timestamp_kex_str + '][ #timestamp " --> " #timestamp]]', line
     ):
         if not current_screen: raise ValueError(f"Should reach a sequence number before timestamp {line}")
         current_screen.timestamps = line
@@ -130,7 +122,6 @@ def process_line(line, current_screen, prev_line, file_out, errors):
         current_screen.txt += line_rearranged + "\n"
     elif line == "":
         if not current_screen: raise ValueError(f"Should reach a sequence number before blank line")
-        assert line != "\n" and prev_line != "", "Should not occur, because normalize() was used: Two end-lines found for screen " + current_screen
         current_screen.end_line_found = True
     else:
 
@@ -150,16 +141,18 @@ def process_line(line, current_screen, prev_line, file_out, errors):
             raise ValueError(f"expect LTR sentence, found {line}")
     return current_screen
 
+
 def usage():
     print("Usage: subtitles-righttoleft.py file_in [file_out]")
 
+
 def main():
-    if len(sys.argv)<2:
+    if len(sys.argv) < 2:
         raise ValueError(usage())
     file_in = os.path.abspath(sys.argv[1])
     path_in = Path(file_in)
-    if len(sys.argv)>2:
-        file_out=sys.argv[2]
+    if len(sys.argv) > 2:
+        file_out = sys.argv[2]
     else:
         file_out = Path(path_in.parent, "rtl_" + path_in.name)
     print("output", file_out)
