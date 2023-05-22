@@ -8,7 +8,7 @@ This open-source project does that.  The video players will render the text to l
 
 
 
-#Usage
+# Usage
 
 Compose your SRT file normally, then call this tool as follows:
 `subtitles-righttoleft.py file_in [file_out]`
