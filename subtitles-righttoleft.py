@@ -133,33 +133,44 @@ def process_line(line, current_screen, prev_line, file_out, errors):
         assert line != "\n" and prev_line != "", "Should not occur, because normalize() was used: Two end-lines found for screen " + current_screen
         current_screen.end_line_found = True
     else:
+
+        def is_ltr_sentence(line):
+            sentence = ke.match(
+                "[#punc="
+                + punc_ke()
+                + " #start_line [1+ [#letter | #digit | #space| #punc]] #end_line]"
+                , line)
+            sentence_with_letter = ke.match("[1+[#letter ]]", line)
+            has_rtl = any((unicodedata.bidirectional(c) == "R") for c in line)
+            return sentence and sentence_with_letter and not has_rtl
+
         if not current_screen: raise ValueError(f"Should reach a sequence number before ordinary text {line}")
         current_screen.txt += line + "\n"
         if not is_ltr_sentence(line):
             raise ValueError(f"expect LTR sentence, found {line}")
     return current_screen
 
-
-def is_ltr_sentence(line):
-    sentence = ke.match(
-        "[#punc="
-        + punc_ke()
-        + " #start_line [1+ [#letter | #digit | #space| #punc]] #end_line]"
-        , line)
-    sentence_with_letter = ke.match("[1+[#letter ]]", line)
-    has_rtl = any((unicodedata.bidirectional(c) == "R") for c in line)
-    return sentence and sentence_with_letter and not has_rtl
-
+def usage():
+    print("Usage: subtitles-righttoleft.py file_in [file_out]")
 
 def main():
+    if len(sys.argv)<2:
+        raise ValueError(usage())
     file_in = os.path.abspath(sys.argv[1])
     path_in = Path(file_in)
-    file_out = Path(path_in.parent, "rtl_" + path_in.name)
+    if len(sys.argv)>2:
+        file_out=sys.argv[2]
+    else:
+        file_out = Path(path_in.parent, "rtl_" + path_in.name)
     print("output", file_out)
     process(file_in, file_out)
 
 
 if __name__ == "__main__":
     start = time.time()
+    if sys.argv[1].startswith("-h"):
+        usage()
+        exit(1)
+
     main()
     print(round(time.time() - start), "sec")
