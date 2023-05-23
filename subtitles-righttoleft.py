@@ -29,7 +29,7 @@ class Screen:
     def __str__(self):
         return f"""{self.sequence_number}
 {self.timestamps}
-{self.txt}\n"""
+{self.txt}\r\n"""# VLC cannot handle Unix endlines
 
 
 @lru_cache
@@ -165,13 +165,17 @@ def main():
     path_in = Path(file_in)
     if len(sys.argv) > 2:
         file_out = sys.argv[2]
+        if os.path.sep not in  file_out:
+            file_out = Path(path_in.parent, file_out)
     else:
         file_out = Path(path_in.parent, "rtl_" + path_in.name)
+    print("input", file_in)
     print("output", file_out)
     process(file_in, file_out)
 
 
 if __name__ == "__main__":
+    print (sys.version_info)
     start = time.time()
     if sys.argv[1].startswith("-h"):
         usage()
