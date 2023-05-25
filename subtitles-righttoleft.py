@@ -150,7 +150,7 @@ def process_line(line, current_screen, file_out, errors):
             )
         current_screen.txt += line + "\n"
         if not is_ltr_sentence(line):
-            raise ValueError(f"expect LTR sentence, found {line}")
+            raise ValueError(f"Unexpected: {line}")
     return current_screen
 
 
